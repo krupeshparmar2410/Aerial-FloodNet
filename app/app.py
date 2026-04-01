@@ -37,7 +37,7 @@ def read_img():
 # Home (Frontend)
 @app.route("/")
 def index():
-    return send_from_directory("static", "floodnet_frontend.html")
+    return send_from_directory(app.static_folder, "floodnet_frontend.html")
 
 
 # Task 1: Classification
@@ -58,7 +58,7 @@ def segment():
     return jsonify(predict_segmentation(img))
 
 
-# Health Check (Important for debugging)
+# Health Check
 @app.route("/api/health")
 def health():
     md = os.path.join(os.path.dirname(__file__), "..", "models")
@@ -66,9 +66,6 @@ def health():
     models = {
         "task1_model": os.path.exists(os.path.join(md, "task1_model.pkl")),
         "task2_model": os.path.exists(os.path.join(md, "task2_model.pkl")),
-        "task3_model": os.path.exists(os.path.join(md, "task3_model.pkl")),
-        "task3_tfidf": os.path.exists(os.path.join(md, "task3_tfidf.pkl")),
-        "task3_label_encoder": os.path.exists(os.path.join(md, "task3_label_encoder.pkl")),
     }
 
     return jsonify({
@@ -79,14 +76,12 @@ def health():
 
 
 # -------------------------
-# Run App (IMPORTANT FIX)
+# Run App
 # -------------------------
 if __name__ == "__main__":
     print("=" * 50)
     print("  FloodNet Flask Backend Running")
     print("=" * 50)
 
-    # Render provides PORT dynamically
     port = int(os.environ.get("PORT", 10000))
-
     app.run(host="0.0.0.0", port=port, debug=False)
