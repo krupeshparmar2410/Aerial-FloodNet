@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # FloodNet ML Project — README
 ## Setup Instructions
 
@@ -46,3 +47,6 @@ http://localhost:5000
 - Task 1 Classification : 96.25%
 - Task 2 Segmentation   : 94.07%
 - Task 3 VQA            : >75%
+=======
+# Aerial-FloodNet
+>>>>>>> 061f957dd4f33f88ef57b5ea520f5b580d0bb8d6
