@@ -1,5 +1,5 @@
 """
-predict.py — FloodNet Prediction Helper (Production Safe)
+predict.py — FloodNet Prediction Helper (Production Safe + UNCERTAIN FIX)
 """
 
 import os
@@ -12,7 +12,7 @@ from skimage.feature import hog
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODELS_DIR = os.path.join(BASE_DIR, "..", "models")
 
-# ── Load Models ONCE (IMPORTANT) ──────────────────────
+# ── Load Models ONCE ──────────────────────────────────
 try:
     TASK1_MODEL = joblib.load(os.path.join(MODELS_DIR, "task1_model.pkl"))
     TASK2_MODEL = joblib.load(os.path.join(MODELS_DIR, "task2_model.pkl"))
@@ -57,7 +57,7 @@ def extract_features(img_bgr):
     return np.concatenate([hog_feat, color_feat])
 
 
-# ── Task 1: Classification ────────────────────────────
+# ── Task 1 ────────────────────────────────────────────
 def predict_classification(img_bgr):
     if not MODELS_LOADED:
         return {"error": "Model not loaded"}
@@ -78,7 +78,7 @@ def predict_classification(img_bgr):
         return {"error": str(e)}
 
 
-# ── Sub-class logic (same as yours) ───────────────────
+# ── Sub-class ─────────────────────────────────────────
 def _sub_classify_patch(patch_bgr, binary_pred):
     p   = cv2.resize(patch_bgr, (32, 32)).astype(np.float32)
     hsv = cv2.cvtColor(p.astype(np.uint8), cv2.COLOR_BGR2HSV)
@@ -110,7 +110,7 @@ def _sub_classify_patch(patch_bgr, binary_pred):
         return 2
 
 
-# ── Task 2: Segmentation ──────────────────────────────
+# ── Task 2: Segmentation (FIXED) ─────────────────────
 def predict_segmentation(img_bgr):
     import base64
 
@@ -159,7 +159,22 @@ def predict_segmentation(img_bgr):
         avg_conf = float(np.mean(max_probas))
         conf_std = float(np.std(max_probas))
 
-        verdict = "FLOODED" if flooded_pct > 50 else "NOT_FLOODED"
+        # ✅ NEW UNCERTAINTY LOGIC
+        CONF_THRESHOLD = 0.65
+        CONF_STD_THRESHOLD = 0.18
+        FLOOD_LOW = 20
+        FLOOD_HIGH = 60
+
+        low_conf = avg_conf < CONF_THRESHOLD
+        high_variation = conf_std > CONF_STD_THRESHOLD
+        ambiguous = FLOOD_LOW <= flooded_pct <= FLOOD_HIGH
+
+        if low_conf or high_variation or ambiguous:
+            verdict = "UNCERTAIN"
+        elif flooded_pct > FLOOD_HIGH:
+            verdict = "FLOODED"
+        else:
+            verdict = "NOT_FLOODED"
 
         return {
             "mask_b64": base64.b64encode(buf).decode("utf-8"),
@@ -171,6 +186,7 @@ def predict_segmentation(img_bgr):
             "avg_conf": round(avg_conf * 100, 1),
             "conf_std": round(conf_std * 100, 1),
             "verdict": verdict,
+            "uncertain": verdict == "UNCERTAIN"
         }
 
     except Exception as e:
