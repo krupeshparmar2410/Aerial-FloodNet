@@ -132,20 +132,45 @@ def predict_segmentation(img_bgr):
 
         probas = TASK2_MODEL.predict_proba(patch_arr)
         binary_preds = np.argmax(probas, axis=1)
+        max_probas = np.max(probas, axis=1)
 
+        class_counts = {name: 0 for name in CLASS_NAMES}
         overlay = img.copy()
 
         for (r, c), bp in zip(coords, binary_preds):
             cls = _sub_classify_patch(img[r:r+ph, c:c+pw], bp)
             overlay[r:r+ph, c:c+pw] = SEG_COLORS.get(cls, (128,128,128))
+            class_counts[CLASS_NAMES[cls]] += 1
 
         blended = cv2.addWeighted(img, 0.4, overlay, 0.6, 0)
-
         _, buf = cv2.imencode(".png", blended)
+
+        total_patches = sum(class_counts.values())
+
+        class_pcts = {
+            name: round(cnt / total_patches * 100, 1) if total_patches > 0 else 0.0
+            for name, cnt in class_counts.items()
+        }
+
+        flooded_classes = {"Building-Flooded", "Road-Flooded", "Water"}
+        flooded_pct = sum(class_pcts[n] for n in flooded_classes)
+        safe_pct = 100.0 - flooded_pct
+
+        avg_conf = float(np.mean(max_probas))
+        conf_std = float(np.std(max_probas))
+
+        verdict = "FLOODED" if flooded_pct > 50 else "NOT_FLOODED"
 
         return {
             "mask_b64": base64.b64encode(buf).decode("utf-8"),
-            "status": "success"
+            "class_dist": class_counts,
+            "class_pcts": class_pcts,
+            "total_patches": total_patches,
+            "flooded_pct": round(flooded_pct, 1),
+            "safe_pct": round(safe_pct, 1),
+            "avg_conf": round(avg_conf * 100, 1),
+            "conf_std": round(conf_std * 100, 1),
+            "verdict": verdict,
         }
 
     except Exception as e:
